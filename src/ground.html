@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>直播房间列表</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!--房间列表-->
+<div class="container">
+    <h1 class="text-info text-center">正在直播的房间</h1>
+    <ul class="list-group roomList" style="width: 250px;height: auto">
+        <!--<li class="list-group-item">-->
+            <!--房间名称-->
+            <!--<a href="#" class="btn btn-link">前往观看</a>-->
+        <!--</li>-->
+    </ul>
+
+    <form role="form" class="creatRoom" href="#" action="#">
+        <p class="text-center">创建新的房间</p>
+        <div class="form-group">
+            <input class="form-control message roomName" type="text" name="roomName" placeholder="房间名称">
+        </div>
+        <div class="form-group">
+            <input class="form-control message roomOwner" type="text" name="roomOwner" placeholder="主播姓名">
+        </div>
+        <div class="form-group">
+            <button type="button" class="btn btn-info" id="addRooom">确认创建</button>
+        </div>
+    </form>
+</div>
+
+<script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
+<script type="text/javascript" src="js/bootstrap.min.js"></script>
+<script type="text/javascript" src="js/socket.io.js"></script>
+<script type="text/javascript">
+    $(function () {
+        //连接socket后端服务器
+        var socket=io.connect("ws://127.0.0.1:8888");
+        //获取所有房间
+        socket.on("getAllRoom",function (o) {
+            console.log(o);
+            getAllRoom(o);
+        });
+        //获取实时房间列表
+        socket.on("addRoom",function (o) {
+            updataRoom(o,"addRoom");
+        });
+
+        //实时跟新房间
+        socket.on("removeRoom",function (o) {
+            updataRoom(o,"removeRoom");
+        });
+
+        //创建新房间，并广播出去
+        $("#addRooom").click(function () {
+            roomInfo=addRoom();
+            if(roomInfo){
+                var roomId=roomInfo["roomId"];
+                var userId=roomInfo["userId"];
+                var userName=roomInfo["userName"];
+                socket.emit('addRoom',roomInfo);
+                location.href='index.html?room='+roomId+'&userId='+userId+'&type='+1+'&userName='+userName;
+            };
+        });
+
+
+    });
+
+    function getAllRoom(o) {
+        if(!$.isEmptyObject(o)){
+            for(var k in o){
+                var roomId=o[k].roomId;
+                var userId=o[k].userId;
+                var userName=o[k].userName;
+                var html='<li class="list-group-item" data-roomId="'+roomId+'">'+roomId+'<a href="index.html?room='+roomId+'&userId='+userId+'&type='+1+'&userName='+userName+'" class="btn btn-link">前往观看</a></li>'
+                $(".list-group").append(html);
+            }
+        }
+    }
+    
+    function addRoom() {
+        if($(".creatRoom .roomName").val()&& $(".creatRoom .roomOwner").val()){
+            var user={
+                roomId:$(".creatRoom .roomName").val(),
+                userId:genUid(),
+                userName:$(".creatRoom .roomOwner").val(),
+                type:1    //房间的用户类型 1是房主，每个房间只有一个
+            };
+            return user;
+        } else{
+            return false;
+        }
+    };
+    
+    function updataRoom(o,action) {
+        var roomId=o.roomId;
+        var userName=o.roomName;
+        var html="";
+        if(action=="addRoom"){
+            console.log(o);
+            html='<li class="list-group-item" data-roomId="'+roomId+'">'+roomId+'<a href="index.html?room='+roomId+'" class="btn btn-link">前往观看</a></li>'
+            $(".list-group").append(html);
+        };
+        if(action=="removeRoom"){
+            $(".list-group-item").filter(function (index) {
+                var id=$(this).attr("data-roomId");
+                if(id==roomId){
+                    $(this).remove();
+                };
+            });
+        };
+    };
+
+    function  genUid() {
+        return new Date().getTime()+""+Math.floor(Math.random()*899+100);
+    };
+    
+</script>
+</body>
+</html>
