@@ -117,34 +117,136 @@
             userChange(o,"out")
         });
 
-        if(utype==1){
-            var getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
-            var URL = (window.URL || window.webkitURL || window.msURL || window.oURL);
-            var PeerConnection = (window.PeerConnection || window.webkitPeerConnection00 || window.webkitRTCPeerConnection || window.mozRTCPeerConnection);
+    //     var getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+    //     var URL = (window.URL || window.webkitURL || window.msURL || window.oURL);
+    //     var PeerConnection = (window.PeerConnection || window.webkitPeerConnection00 || window.webkitRTCPeerConnection || window.mozRTCPeerConnection);
+    //     var nativeRTCIceCandidate = (window.mozRTCIceCandidate || window.RTCIceCandidate);
 
-            getUserMedia.call(navigator, {
-                video: true,
-                audio: true
-            }, function(localMediaStream) {
-                var video = document.getElementById('video');
-                if(URL){
-                    video.src = URL.createObjectURL(localMediaStream);
-                }else{
-                    video.src=localMediaStream;
+    //     var video = document.getElementById('video');
+
+
+    //     /*start*/
+    //     var iceServer = {
+    //         "iceServers": [{
+    //             "url": "stun:stun.l.google.com:19302"
+    //         }]
+    //     };
+    //     //创建PeerConnection实例
+    //     var pc = new PeerConnection(iceServer);
+    //     //发送ICE候选到其他客户端
+    //     pc.onicecandidate = function(event){
+    //         socket.emit("__ice_candidate",event.candidate)
+    //     };
+    //     //如果检测到媒体流连接到本地，将其绑定到一个video标签上输出
+    //     pc.onaddstream = function(event){
+    //         video.src = URL.createObjectURL(event.stream);
+    //     };
+    //     //获取本地的媒体流，并绑定到一个video标签上输出，并且发送这个媒体流给其他客户端
+    //     if(utype==1){
+    //         getUserMedia.call(navigator, {
+    //             "audio": true,
+    //             "video": true
+    //         }, function(stream){
+    //             //发送offer和answer的函数，发送本地session描述
+    //             var sendOfferFn = function(desc){
+    //                     pc.setLocalDescription(desc);
+    //                     socket.emit("__offer",desc);
+    //                 },
+    //                 sendAnswerFn = function(desc){
+    //                     pc.setLocalDescription(desc);
+    //                     socket.emit("__answer",desc);
+    //                 };
+    //             //绑定本地媒体流到video标签用于输出
+    //             video.src = URL.createObjectURL(stream);
+    //             //向PeerConnection中加入需要发送的流
+    //             pc.addStream(stream);
+    //             //如果是发送方则发送一个offer信令，否则发送一个answer信令
+    //             pc.createOffer(sendOfferFn);    
+    //         }, function(error){
+    //             console.log('浏览器不支持!', error);
+    //         });
+    //     }else{
+    //         //处理到来的信令
+    //         socket.on('__ice_candidate',function(o) {
+    //             pc.addIceCandidate(new RTCIceCandidate(o));
+    //         });
+    //     }
+    //     /*end*/
+    // };
+
+    function hasUserMedia() {
+        navigator.getUserMedia = navigator.getUserMedia || navigator.msGetUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia||navigator.mediaDevices.getUserMedia;
+        return !!navigator.getUserMedia;
+    }
+
+    function hasRTCPeerConnection() {
+        window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || window.msRTCPeerConnection;
+        return !!window.RTCPeerConnection;
+    }
+
+    var yourVideo = document.getElementById("video");
+    var theirVideo = document.getElementById("video");
+    var yourConnection, theirConnection; 
+    if (hasUserMedia()) {
+        navigator.getUserMedia({ video: true, audio: false },
+            stream => {
+                if(utype==1){
+                    yourVideo.src = window.URL.createObjectURL(stream);
                 }
-                video.autoplay=true;
-                socket.on("stream_created",localMediaStream);
+                if (hasRTCPeerConnection()) {
+                    startPeerConnection(stream);
+                } else {
+                    alert("没有RTCPeerConnection API");
+                }
+            },
+            err => {
+                console.log(err);
+            })
+    } else {
+        alert("没有userMedia API")
+    }
 
-            }, function(e) {
-                console.log('浏览器不支持!', e);
-            });
-        }else {
-            socket.on("mediaStream",function (o) {
-                showMedia(o);
-            });
+
+    function startPeerConnection(stream) {
+        var config = {
+            'iceServers': [{ 'url': 'stun:stun.services.mozilla.com' }, { 'url': 'stun:stunserver.org' }, { 'url': 'stun:stun.l.google.com:19302' }]
+        };
+        
+        theirConnection = new RTCPeerConnection(config);
+
+
+        yourConnection = new RTCPeerConnection(config);
+        yourConnection.onicecandidate = function(e) {
+            if (e.candidate) {
+                console.log("发送出去啦")
+                theirConnection.addIceCandidate(new RTCIceCandidate(e.candidate));
+            }
         }
 
-    };
+        theirConnection.onicecandidate = function(e) {
+            if (e.candidate) {
+                console.log("收到啦")
+                yourConnection.addIceCandidate(new RTCIceCandidate(e.candidate));
+            }
+        }
+        theirConnection.onaddstream = function(e) {
+            console.log(e.stream)
+            theirVideo.src = window.URL.createObjectURL(e.stream);
+        }
+
+
+        yourConnection.addStream(stream);
+
+        yourConnection.createOffer().then(offer => {
+            yourConnection.setLocalDescription(offer);
+            theirConnection.setRemoteDescription(offer);
+            theirConnection.createAnswer().then(answer => {
+                theirConnection.setLocalDescription(answer);
+                yourConnection.setRemoteDescription(answer);
+            })
+        });
+    }
+
 
     //公共方法
     function  genUid() {
@@ -198,16 +300,7 @@
                 +'</div>';
         $(".msg-show-area").append(html);
     }
-
-    function showMedia(o) {
-        var URL = (window.URL || window.webkitURL || window.msURL || window.oURL);
-        if(URL){
-            video.src = URL.createObjectURL(o);
-        }else{
-            video.src=o;
-        }
-        video.autoplay=true;
-    }
+}
 </script>
 </body>
 </html>

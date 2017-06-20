@@ -150,7 +150,8 @@ io.on('connection',function (socket) {
 
     //获取视屏流信息
     socket.on("stream_created",function (obj) {
-        var roomId=socket.roomId
+        var roomId=socket.roomId;
+        console.log(obj);
         socket.join(roomId);
         io.in(roomId).emit('get_stream',obj);
     })
